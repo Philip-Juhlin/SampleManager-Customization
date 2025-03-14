@@ -131,8 +131,157 @@ namespace Customization.Tasks
 
 
                 //Create the samples in Lims on the created job
-                CreateSamples(json, workflow, job);
+                //CreateSamples(json, workflow, job);
 
+
+                int sampleCount = json.SaleOrderSamples.Length;
+                // run the workflow n times based on the number of samples in the json
+                //IList<IEntity> samplesList = RunWorkflowForEntity(job, sampleWorkflow, sampleCount);
+
+                IList<IEntity> samplesList = new List<IEntity>();
+
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    var iSample = json.SaleOrderSamples[i];
+
+                    if (!string.IsNullOrEmpty(iSample.SampleDescription))
+                    {
+                        Workflow sampwf = EntityManager.SelectByName(Workflow.EntityName, GetConfigHeader(iSample.SampleDescription)) as Workflow;
+                        if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, sampwf?.WorkflowGuid) is Workflow sampworkflow))
+                        {
+                            SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {iSample.SampleDescription} on sample {i}");
+                            return;
+                        }
+                        else
+                        {
+
+                            IEntity sample = RunWorkflowForEntity(job, sampwf, 1).FirstOrDefault();
+                            samplesList.Add(sample);
+                        }
+
+                    }
+                    else
+                    {
+                        SetHttpStatus(HttpStatusCode.BadRequest, $"sample {i} does not contain a workflow");
+                        return;
+                    }
+
+
+                }
+                //if the workflow count is not equal to the number of samples then send error
+                if (samplesList.Count != sampleCount)
+                {
+                    SetHttpStatus(HttpStatusCode.BadRequest, $"workflow produces wrong number of samples");
+                    return;
+                }
+
+
+                var saleOrderSamples = json.SaleOrderSamples;
+
+
+                try
+                {
+
+
+                    foreach (var i in samplesList.Zip(saleOrderSamples, (n, w) => new { Sample = n as Sample, InputSample = w }))
+                    {
+                        var sample = i.Sample;
+                        var inputSample = i.InputSample;
+                        sample.JobName = job;
+                        sample.SetSplitSampMethod(inputSample.SplitSampMethod);
+                        sample.SampleName = inputSample.SampleName;
+                        sample.SampleBatch = inputSample.SampleBatch;
+                        sample.ExternalReference = inputSample.ExternalReference;
+                        sample.Variety = inputSample.Variety;
+                        sample.Lod = inputSample.Lod;
+                        sample.SampSubtype = EntityManager.Select<SampleSubtypeBase>(inputSample.SampSubtype);
+                        sample.SampType = EntityManager.Select<SampleTypeBase>(inputSample.SampleType);
+                        sample.SampleSize = inputSample.SampleSize;
+                        sample.SampleSizeUnit = EntityManager.SelectByName(PhraseBase.EntityName, inputSample.SampleSizeUnit) as PhraseBase;
+                        sample.SampleDensity = inputSample.SampleDensity;
+                        sample.SampleDensityUnit = EntityManager.SelectByName(PhraseBase.EntityName, inputSample.SampleDensityUnit) as PhraseBase;
+                        sample.TestSchedule = EntityManager.SelectByName(TestSchedHeaderBase.EntityName, inputSample.TestSchedule) as TestSchedHeaderBase;
+                        sample.Remark = EntityManager.SelectByName(PhraseBase.EntityName, inputSample.SamplesRemarkPhraseID) as PhraseBase;
+                        sample.PooledSample = inputSample.SamplesPooledSamples;
+                        sample.ItkXmlReport = inputSample.SamplesCustomerITKXMLReport;
+                        sample.CustomerPlateName = inputSample.SamplesPlateName;
+                        sample.CustomerPlateWell = inputSample.SamplesPlateWell;
+                        sample.SamplingRequired = inputSample.SamplingReq;
+
+                        //if the sample contain a testpackages then add all the tests from that.
+
+                        if (inputSample.TestSchedule != null)
+                        {
+                            var qtest = EntityManager.CreateQuery<TestSchedHeaderBase>();
+                            qtest.AddEquals(TestSchedHeaderPropertyNames.Identity, inputSample.TestSchedule);
+
+                            if (EntityManager.Select(qtest)?.GetFirst() is TestSchedHeaderBase testSchedHeaderBase)
+                            {
+                                sample.AddTests(testSchedHeaderBase);
+                            }
+
+                        }
+
+                        var analysisList = inputSample.TestList;
+                        if (analysisList != null)
+                        {
+
+                            foreach (var analysis in analysisList)
+                            {
+                                {
+                                    var q = EntityManager.CreateQuery<VersionedAnalysis>();
+                                    q.AddEquals(VersionedAnalysisPropertyNames.Identity, analysis.AnalysisName);
+
+                                    if (EntityManager.Select(q)?.GetFirst() is VersionedAnalysis versionedAnalysis)
+                                    {
+                                        List<TestInternal> tests = i.Sample.AddTest(versionedAnalysis);
+
+                                        if (analysis.TestSchedule != null)
+                                        {
+                                            for (int j = 0; j < tests.Count; j++)
+                                            {
+                                                var qtest = EntityManager.CreateQuery<TestSchedHeaderBase>();
+                                                qtest.AddEquals(TestSchedHeaderPropertyNames.Identity, analysis.TestSchedule);
+
+                                                if (EntityManager.Select(qtest)?.GetFirst() is TestSchedHeaderBase testSchedHeaderBase)
+                                                {
+                                                    var test = tests[j];
+                                                    test.TestSchedule = testSchedHeaderBase;
+                                                }
+                                                else
+                                                {
+                                                    SetHttpStatus(HttpStatusCode.BadRequest, $"testschedule for analysis{analysis} is not correct on sample; {sample.IdText}");
+                                                }
+
+                                            }
+                                        }
+
+                                    }
+
+                                    else
+                                    {
+
+                                        SetHttpStatus(HttpStatusCode.BadRequest, $"missing analysis {analysis.AnalysisName}");
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+
+                    }
+
+                    EntityManager.Commit();
+                    
+
+                }
+
+
+                catch (Exception ex)
+                {
+                    SetHttpStatus(HttpStatusCode.BadRequest, $"Error processing samples: {ex}");
+                    return;
+                }
+            
                 //Split the samples to subsamples 
                 SplitSamples(job);
 
