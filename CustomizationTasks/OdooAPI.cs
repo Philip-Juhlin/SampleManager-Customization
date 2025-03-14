@@ -13,6 +13,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -200,12 +201,44 @@ namespace Customization.Tasks
 
         private Task CreateSamples(SaleOrderJson saleorderjson, Workflow sampleWorkflow, JobHeader job)
         {
-
+            // currently running this with a shitty dict to determine the workflow as soon as i have an update i should do 
+            
+          
 
             int sampleCount = saleorderjson.SaleOrderSamples.Length;
             // run the workflow n times based on the number of samples in the json
-            IList<IEntity> samplesList = RunWorkflowForEntity(job, sampleWorkflow, sampleCount);
+            //IList<IEntity> samplesList = RunWorkflowForEntity(job, sampleWorkflow, sampleCount);
 
+            IList<IEntity> samplesList = new List<IEntity>();
+
+            for(int i = 0; i < sampleCount; i++)
+            {
+                var iSample = saleorderjson.SaleOrderSamples[i];
+
+                if (!string.IsNullOrEmpty(iSample.SampleWorkflow))
+                {
+                    Workflow sampwf = EntityManager.SelectByName(Workflow.EntityName, GetConfigHeader(iSample.SampleWorkflow)) as Workflow;
+                    if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, sampwf?.WorkflowGuid) is Workflow workflow))
+                    {
+                        SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {iSample.SampleWorkflow} on sample {i}");
+                        return null;
+                    }
+                    else
+                    {
+                        
+                        IEntity sample = RunWorkflowForEntity(job, sampwf, 1).FirstOrDefault();
+                        samplesList.Add(sample);
+                    }
+
+                }
+                else
+                {
+                    SetHttpStatus(HttpStatusCode.BadRequest, $"sample {i} does not contain a workflow");
+                    return null;
+                }
+
+
+            }
             //if the workflow count is not equal to the number of samples then send error
             if (samplesList.Count != sampleCount)
             {
@@ -232,11 +265,8 @@ namespace Customization.Tasks
                     sample.ExternalReference = inputSample.ExternalReference;
                     sample.Variety = inputSample.Variety;
                     sample.Lod = inputSample.Lod;
-                    sample.Description = inputSample.SampSubtype;
-                    sample.SampSubtype = EntityManager.SelectByName(SampleSubtypeBase.EntityName, "CORN") as SampleSubtypeBase;
-
-                    sample.SampSubtype = EntityManager.SelectByName(SampleSubtypeBase.EntityName, inputSample.SampSubtype) as SampleSubtypeBase;
-                    sample.SampType = EntityManager.SelectByName(SampleTypeBase.EntityName, inputSample.SampleType) as SampleTypeBase;
+                    sample.SampSubtype = EntityManager.Select<SampleSubtypeBase>(inputSample.SampSubtype); 
+                    sample.SampType = EntityManager.Select<SampleTypeBase>(inputSample.SampleType);
                     sample.SampleSize = inputSample.SampleSize;
                     sample.SampleSizeUnit = EntityManager.SelectByName(PhraseBase.EntityName, inputSample.SampleSizeUnit) as PhraseBase;
                     sample.SampleDensity = inputSample.SampleDensity;

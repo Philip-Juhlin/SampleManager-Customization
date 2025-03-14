@@ -275,7 +275,7 @@ namespace Customization.Tasks
         /// <value>
         /// the sample batch
         /// </value>
-        [DataMember(Name = "SampleBatch")]
+        [DataMember(Name = "SamplesBatch")]
         public string SampleBatch { get; set; }
 
         /// <summary>
@@ -350,6 +350,15 @@ namespace Customization.Tasks
         /// </value>
         [DataMember(Name = "SamplesSplitMethodPhraseID")]
         public string SplitSampMethod { get; set; }
+
+        /// <summary>
+        /// Gets or sets the workflow.
+        /// </summary>
+        /// <value>
+        /// The workflow.
+        /// </value>
+        [DataMember(Name = "SamplesWorkflow")]
+        public string SampleWorkflow { get; set; }
 
         /// <summary>
         /// Gets or sets the limit of detection.
