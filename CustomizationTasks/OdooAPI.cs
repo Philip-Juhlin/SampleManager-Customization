@@ -63,235 +63,222 @@ namespace Customization.Tasks
         // public get json input
         public void ProcessSaleOrder(SaleOrderJson json)
         {
+
+
+            string jobname = json.SaleOrderName;
+
+
+            //check if job exists.
+
+            if (EntityManager.SelectByName(JobHeader.EntityName, jobname) is JobHeader)
+            {
+                SetHttpStatus(HttpStatusCode.BadRequest, $"job: {jobname} already exist in LIMS");
+                return;
+            }
+
+
+
+            //Check for a workflow..
+            Workflow wf = EntityManager.SelectByName(Workflow.EntityName, GetConfigHeader("ITK_STANDARD_JOB")) as Workflow;
+            if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, wf?.WorkflowGuid) is Workflow jobWorkFlow))
+            {
+                SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {wf}");
+                return;
+            }
+
+            //run the workflow for creating the job 1 time
+            IList<IEntity> jobs = RunWorkflowForEntity(null, jobWorkFlow, 1);
+            JobHeader job;
+
+            // if jobs.count is not equal to 1 then the workflow did not create a job or produced the wrong number... 
+            if (jobs.Count != 1)
+            {
+                // send error and return.
+                SetHttpStatus(HttpStatusCode.BadRequest, $"workflow {jobWorkFlow} did'nt produce any job");
+                return;
+            }
+
+
+            //Set the data on the job based on the saleorder information
+            job = jobs[0] as JobHeader;
+            job.JobName = jobname;
+            job.CustomerId = GetCustomer(json.customerName);
+            job.BrowseDescription = json.BrowseDescription;
+            job.JobComments = json.JobComments;
+            job.ConfirmationEmail = json.ConfirmationEmail;
+            job.ReportEmail = json.ReportEmail;
+            var customer = EntityManager.Select<Customer>(job.CustomerId.Identity);
+            job.ContactPersonConfirmation = GetCustomerAdress(json.ContactPersConfirm, customer);
+            job.ContactPersonReport = GetCustomerAdress(json.ContactPersReport, customer);
+            job.ContactPersonInvoice = GetCustomerAdress(json.ContactPersInvoic, customer);
+            job.JobType = EntityManager.SelectByName(PhraseBase.EntityName, json.JobTypePhraseID) as PhraseBase;
+            job.PoNumber = json.PoNumber;
+            job.ServiceLevel = EntityManager.SelectByName(PhraseBase.EntityName, json.serviceLevel) as PhraseBase;
+            job.ServiceLevelDays = EntityManager.SelectByName(PhraseBase.EntityName, json.serviceLevelDays) as PhraseBase;
+            job.SetItkWorkProgress("J01");
+
+            /*
+             * need to choose the correct customer in lims based on data from odoo, the identity in SM does not exist for all of the customers, 
+             * if we could make it so that odoo create the customer then the ODOO identity could be added to all the customer and the that could be the key.
+             * 
+             */
+
+            // some sloppy method of desciding the workflow for the samples based on the jobtype..
+            //var workflow = GetWorkflow(json.jobType);
+
+
+            //Create the samples in Lims on the created job
+            //CreateSamples(json, workflow, job);
+
+
+            int sampleCount = json.SaleOrderSamples.Length;
+
+            string workflowfirst = json.SaleOrderSamples[0].SampleDescription;
+
+            if (!string.IsNullOrEmpty(workflowfirst))
+            {
+
+                SetHttpStatus(HttpStatusCode.BadRequest, "the sample desciption is empty");
+
+            }
+
+
+
+
+            Workflow sampwf = EntityManager.SelectByName(Workflow.EntityName, GetConfigHeader(workflowfirst)) as Workflow;
+            if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, sampwf?.WorkflowGuid) is Workflow sampworkflow))
+            {
+                SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {workflowfirst} ");
+                return;
+            }
+
+            // run the workflow n times based on the number of samples in the json
+            IList<IEntity> samplesList = RunWorkflowForEntity(job, sampwf, sampleCount);
+
+            //if the workflow count is not equal to the number of samples then send error
+            if (samplesList.Count != sampleCount)
+            {
+                SetHttpStatus(HttpStatusCode.BadRequest, $"workflow produces wrong number of samples");
+                return;
+            }
+
+
+            var saleOrderSamples = json.SaleOrderSamples;
+
+
             try
             {
-                string jobname = json.SaleOrderName;
 
 
-                //check if job exists.
-
-                if (EntityManager.SelectByName(JobHeader.EntityName, jobname) is JobHeader)
+                foreach (var i in samplesList.Zip(saleOrderSamples, (n, w) => new { Sample = n as Sample, InputSample = w }))
                 {
-                    SetHttpStatus(HttpStatusCode.BadRequest, $"job: {jobname} already exist in LIMS");
-                    return;
-                }
+                    var sample = i.Sample;
+                    var inputSample = i.InputSample;
+                    sample.JobName = job;
+                    sample.SetSplitSampMethod(inputSample.SplitSampMethod);
+                    sample.SampleName = inputSample.SampleName;
+                    sample.SampleBatch = inputSample.SampleBatch;
+                    sample.ExternalReference = inputSample.ExternalReference;
+                    sample.Variety = inputSample.Variety;
+                    sample.Lod = inputSample.Lod;
+                    sample.SampSubtype = EntityManager.Select<SampleSubtypeBase>(inputSample.SampSubtype);
+                    sample.SampType = EntityManager.Select<SampleTypeBase>(inputSample.SampleType);
+                    sample.SampleSize = inputSample.SampleSize;
+                    sample.SampleSizeUnit = EntityManager.SelectByName(PhraseBase.EntityName, inputSample.SampleSizeUnit) as PhraseBase;
+                    sample.SampleDensity = inputSample.SampleDensity;
+                    sample.SampleDensityUnit = EntityManager.SelectByName(PhraseBase.EntityName, inputSample.SampleDensityUnit) as PhraseBase;
+                    sample.TestSchedule = EntityManager.SelectByName(TestSchedHeaderBase.EntityName, inputSample.TestSchedule) as TestSchedHeaderBase;
+                    sample.Remark = EntityManager.SelectByName(PhraseBase.EntityName, inputSample.SamplesRemarkPhraseID) as PhraseBase;
+                    sample.PooledSample = inputSample.SamplesPooledSamples;
+                    sample.ItkXmlReport = inputSample.SamplesCustomerITKXMLReport;
+                    sample.CustomerPlateName = inputSample.SamplesPlateName;
+                    sample.CustomerPlateWell = inputSample.SamplesPlateWell;
+                    sample.SamplingRequired = inputSample.SamplingReq;
 
+                    //if the sample contain a testpackages then add all the tests from that.
 
-
-                //Check for a workflow..
-                Workflow wf = EntityManager.SelectByName(Workflow.EntityName, GetConfigHeader("ITK_STANDARD_JOB")) as Workflow;
-                if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, wf?.WorkflowGuid) is Workflow jobWorkFlow))
-                {
-                    SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {wf}");
-                    return;
-                }
-
-                //run the workflow for creating the job 1 time
-                IList<IEntity> jobs = RunWorkflowForEntity(null, jobWorkFlow, 1);
-                JobHeader job;
-
-                // if jobs.count is not equal to 1 then the workflow did not create a job or produced the wrong number... 
-                if (jobs.Count != 1)
-                {
-                    // send error and return.
-                    SetHttpStatus(HttpStatusCode.BadRequest, $"workflow {jobWorkFlow} did'nt produce any job");
-                    return;
-                }
-
-
-                //Set the data on the job based on the saleorder information
-                job = jobs[0] as JobHeader;
-                job.JobName = jobname;
-                job.CustomerId = GetCustomer(json.customerName);
-                job.BrowseDescription = json.BrowseDescription;
-                job.JobComments = json.JobComments;
-                job.ConfirmationEmail = json.ConfirmationEmail;
-                job.ReportEmail = json.ReportEmail;
-                var customer = EntityManager.Select<Customer>(job.CustomerId.Identity);
-                job.ContactPersonConfirmation = GetCustomerAdress(json.ContactPersConfirm, customer);
-                job.ContactPersonReport = GetCustomerAdress(json.ContactPersReport, customer);
-                job.ContactPersonInvoice = GetCustomerAdress(json.ContactPersInvoic, customer);
-                job.JobType = EntityManager.SelectByName(PhraseBase.EntityName, json.JobTypePhraseID) as PhraseBase;
-                job.PoNumber = json.PoNumber;
-                job.ServiceLevel = EntityManager.SelectByName(PhraseBase.EntityName, json.serviceLevel) as PhraseBase;
-                job.ServiceLevelDays = EntityManager.SelectByName(PhraseBase.EntityName, json.serviceLevelDays) as PhraseBase;
-                job.SetItkWorkProgress("J01");
-
-                /*
-                 * need to choose the correct customer in lims based on data from odoo, the identity in SM does not exist for all of the customers, 
-                 * if we could make it so that odoo create the customer then the ODOO identity could be added to all the customer and the that could be the key.
-                 * 
-                 */
-
-                // some sloppy method of desciding the workflow for the samples based on the jobtype..
-                //var workflow = GetWorkflow(json.jobType);
-
-
-                //Create the samples in Lims on the created job
-                //CreateSamples(json, workflow, job);
-
-
-                int sampleCount = json.SaleOrderSamples.Length;
-
-                string workflowfirst = json.SaleOrderSamples[0].SampleDescription;
-
-                if (!string.IsNullOrEmpty(workflowfirst))
-                {
-
-                    SetHttpStatus(HttpStatusCode.BadRequest, "the sample desciption is empty");
-
-                }
-
-                Workflow sampwf = EntityManager.SelectByName(Workflow.EntityName, GetConfigHeader(workflowfirst)) as Workflow;
-                if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, sampwf?.WorkflowGuid) is Workflow sampworkflow))
-                {
-                    SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {workflowfirst} ");
-                    return;
-                }
-
-                    // run the workflow n times based on the number of samples in the json
-                    //IList<IEntity> samplesList = RunWorkflowForEntity(job, sampleWorkflow, sampleCount);
-
-                IList<IEntity> samplesList = new List<IEntity>();
-
-                for (int i = 0; i < sampleCount; i++)
-                {
-                    var iSample = json.SaleOrderSamples[i];
-
-               
-                            IEntity sample = RunWorkflowForEntity(job, sampwf, 1).FirstOrDefault();
-                            samplesList.Add(sample);
-                        
-
-                }
-                //if the workflow count is not equal to the number of samples then send error
-                if (samplesList.Count != sampleCount)
-                {
-                    SetHttpStatus(HttpStatusCode.BadRequest, $"workflow produces wrong number of samples");
-                    return;
-                }
-
-
-                var saleOrderSamples = json.SaleOrderSamples;
-
-
-                try
-                {
-
-
-                    foreach (var i in samplesList.Zip(saleOrderSamples, (n, w) => new { Sample = n as Sample, InputSample = w }))
+                    if (inputSample.TestSchedule != null)
                     {
-                        var sample = i.Sample;
-                        var inputSample = i.InputSample;
-                        sample.JobName = job;
-                        sample.SetSplitSampMethod(inputSample.SplitSampMethod);
-                        sample.SampleName = inputSample.SampleName;
-                        sample.SampleBatch = inputSample.SampleBatch;
-                        sample.ExternalReference = inputSample.ExternalReference;
-                        sample.Variety = inputSample.Variety;
-                        sample.Lod = inputSample.Lod;
-                        sample.SampSubtype = EntityManager.Select<SampleSubtypeBase>(inputSample.SampSubtype);
-                        sample.SampType = EntityManager.Select<SampleTypeBase>(inputSample.SampleType);
-                        sample.SampleSize = inputSample.SampleSize;
-                        sample.SampleSizeUnit = EntityManager.SelectByName(PhraseBase.EntityName, inputSample.SampleSizeUnit) as PhraseBase;
-                        sample.SampleDensity = inputSample.SampleDensity;
-                        sample.SampleDensityUnit = EntityManager.SelectByName(PhraseBase.EntityName, inputSample.SampleDensityUnit) as PhraseBase;
-                        sample.TestSchedule = EntityManager.SelectByName(TestSchedHeaderBase.EntityName, inputSample.TestSchedule) as TestSchedHeaderBase;
-                        sample.Remark = EntityManager.SelectByName(PhraseBase.EntityName, inputSample.SamplesRemarkPhraseID) as PhraseBase;
-                        sample.PooledSample = inputSample.SamplesPooledSamples;
-                        sample.ItkXmlReport = inputSample.SamplesCustomerITKXMLReport;
-                        sample.CustomerPlateName = inputSample.SamplesPlateName;
-                        sample.CustomerPlateWell = inputSample.SamplesPlateWell;
-                        sample.SamplingRequired = inputSample.SamplingReq;
+                        var qtest = EntityManager.CreateQuery<TestSchedHeaderBase>();
+                        qtest.AddEquals(TestSchedHeaderPropertyNames.Identity, inputSample.TestSchedule);
 
-                        //if the sample contain a testpackages then add all the tests from that.
-
-                        if (inputSample.TestSchedule != null)
+                        if (EntityManager.Select(qtest)?.GetFirst() is TestSchedHeaderBase testSchedHeaderBase)
                         {
-                            var qtest = EntityManager.CreateQuery<TestSchedHeaderBase>();
-                            qtest.AddEquals(TestSchedHeaderPropertyNames.Identity, inputSample.TestSchedule);
-
-                            if (EntityManager.Select(qtest)?.GetFirst() is TestSchedHeaderBase testSchedHeaderBase)
-                            {
-                                sample.AddTests(testSchedHeaderBase);
-                            }
-
-                        }
-
-                        var analysisList = inputSample.TestList;
-                        if (analysisList != null)
-                        {
-
-                            foreach (var analysis in analysisList)
-                            {
-                                {
-                                    var q = EntityManager.CreateQuery<VersionedAnalysis>();
-                                    q.AddEquals(VersionedAnalysisPropertyNames.Identity, analysis.AnalysisName);
-
-                                    if (EntityManager.Select(q)?.GetFirst() is VersionedAnalysis versionedAnalysis)
-                                    {
-                                        List<TestInternal> tests = i.Sample.AddTest(versionedAnalysis);
-
-                                        if (analysis.TestSchedule != null)
-                                        {
-                                            for (int j = 0; j < tests.Count; j++)
-                                            {
-                                                var qtest = EntityManager.CreateQuery<TestSchedHeaderBase>();
-                                                qtest.AddEquals(TestSchedHeaderPropertyNames.Identity, analysis.TestSchedule);
-
-                                                if (EntityManager.Select(qtest)?.GetFirst() is TestSchedHeaderBase testSchedHeaderBase)
-                                                {
-                                                    var test = tests[j];
-                                                    test.TestSchedule = testSchedHeaderBase;
-                                                }
-                                                else
-                                                {
-                                                    SetHttpStatus(HttpStatusCode.BadRequest, $"testschedule for analysis{analysis} is not correct on sample; {sample.IdText}");
-                                                }
-
-                                            }
-                                        }
-
-                                    }
-
-                                    else
-                                    {
-
-                                        SetHttpStatus(HttpStatusCode.BadRequest, $"missing analysis {analysis.AnalysisName}");
-                                        return;
-                                    }
-                                }
-                            }
+                            sample.AddTests(testSchedHeaderBase);
                         }
 
                     }
 
-                    EntityManager.Commit();
+                    var analysisList = inputSample.TestList;
+                    if (analysisList != null)
+                    {
 
+                        foreach (var analysis in analysisList)
+                        {
+                            {
+                                var q = EntityManager.CreateQuery<VersionedAnalysis>();
+                                q.AddEquals(VersionedAnalysisPropertyNames.Identity, analysis.AnalysisName);
+
+                                if (EntityManager.Select(q)?.GetFirst() is VersionedAnalysis versionedAnalysis)
+                                {
+                                    List<TestInternal> tests = i.Sample.AddTest(versionedAnalysis);
+
+                                    if (analysis.TestSchedule != null)
+                                    {
+                                        for (int j = 0; j < tests.Count; j++)
+                                        {
+                                            var qtest = EntityManager.CreateQuery<TestSchedHeaderBase>();
+                                            qtest.AddEquals(TestSchedHeaderPropertyNames.Identity, analysis.TestSchedule);
+
+                                            if (EntityManager.Select(qtest)?.GetFirst() is TestSchedHeaderBase testSchedHeaderBase)
+                                            {
+                                                var test = tests[j];
+                                                test.TestSchedule = testSchedHeaderBase;
+                                            }
+                                            else
+                                            {
+                                                SetHttpStatus(HttpStatusCode.BadRequest, $"testschedule for analysis{analysis} is not correct on sample; {sample.IdText}");
+                                            }
+
+                                        }
+                                    }
+
+                                }
+
+                                else
+                                {
+
+                                    SetHttpStatus(HttpStatusCode.BadRequest, $"missing analysis {analysis.AnalysisName}");
+                                    return;
+                                }
+                            }
+                        }
+                    }
 
                 }
 
-
-                catch (Exception ex)
-                {
-                    SetHttpStatus(HttpStatusCode.BadRequest, $"Error processing samples: {ex}");
-                    return;
-                }
-
-                //Split the samples to subsamples 
-                SplitSamples(job);
-
-
-                // now check for all the tests that do not have a component list
-                CleanupTask(job);
-
-                SetHttpStatus(HttpStatusCode.OK, $"Successfully logged in {job} with {job.Samples.Count} samples");
                 EntityManager.Commit();
+
+
             }
+
+
             catch (Exception ex)
             {
-                SetHttpStatus(HttpStatusCode.BadRequest, ex.Message);
+                SetHttpStatus(HttpStatusCode.BadRequest, $"Error processing samples: {ex}");
+                return;
             }
+
+            //Split the samples to subsamples 
+            SplitSamples(job);
+
+
+            // now check for all the tests that do not have a component list
+            CleanupTask(job);
+
+            SetHttpStatus(HttpStatusCode.OK, $"Successfully logged in {job} with {job.Samples.Count} samples");
+            EntityManager.Commit();
+
 
 
 
