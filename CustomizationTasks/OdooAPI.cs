@@ -221,7 +221,7 @@ namespace Customization.Tasks
                     if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, sampwf?.WorkflowGuid) is Workflow workflow))
                     {
                         SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {iSample.SampleWorkflow} on sample {i}");
-                        return null;
+                        return Task.CompletedTask;
                     }
                     else
                     {
@@ -234,7 +234,7 @@ namespace Customization.Tasks
                 else
                 {
                     SetHttpStatus(HttpStatusCode.BadRequest, $"sample {i} does not contain a workflow");
-                    return null;
+                    return Task.CompletedTask;
                 }
 
 
