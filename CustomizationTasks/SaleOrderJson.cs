@@ -351,14 +351,14 @@ namespace Customization.Tasks
         [DataMember(Name = "SamplesSplitMethodPhraseID")]
         public string SplitSampMethod { get; set; }
 
-        /// <summary>
-        /// Gets or sets the workflow.
-        /// </summary>
-        /// <value>
-        /// The workflow.
-        /// </value>
-        [DataMember(Name = "SamplesWorkflow")]
-        public string SampleWorkflow { get; set; }
+        ///// <summary>
+        ///// Gets or sets the workflow.
+        ///// </summary>
+        ///// <value>
+        ///// The workflow.
+        ///// </value>
+        //[DataMember(Name = "SamplesWorkflow")]
+        //public string SampleWorkflow { get; set; }
 
         /// <summary>
         /// Gets or sets the limit of detection.
