@@ -13,14 +13,11 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.ServiceModel.Web;
-using System.Text;
 using System.Threading.Tasks;
-using System.Web;
 using System.Xml.Serialization;
 using Thermo.SampleManager.Common.Data;
 using Thermo.SampleManager.Common.Workflow;
@@ -127,7 +124,7 @@ namespace Customization.Tasks
                  */
 
                 // some sloppy method of desciding the workflow for the samples based on the jobtype..
-                var workflow = GetWorkflow(json.jobType);
+                //var workflow = GetWorkflow(json.jobType);
 
 
                 //Create the samples in Lims on the created job
@@ -271,7 +268,7 @@ namespace Customization.Tasks
                     }
 
                     EntityManager.Commit();
-                    
+
 
                 }
 
@@ -281,7 +278,7 @@ namespace Customization.Tasks
                     SetHttpStatus(HttpStatusCode.BadRequest, $"Error processing samples: {ex}");
                     return;
                 }
-            
+
                 //Split the samples to subsamples 
                 SplitSamples(job);
 
@@ -302,7 +299,7 @@ namespace Customization.Tasks
 
         }
         #endregion
-        
+
 
         #region privatemethodssaleorder
 
@@ -351,8 +348,8 @@ namespace Customization.Tasks
         private Task CreateSamples(SaleOrderJson saleorderjson, Workflow sampleWorkflow, JobHeader job)
         {
             // currently running this with a shitty dict to determine the workflow as soon as i have an update i should do 
-            
-          
+
+
 
             int sampleCount = saleorderjson.SaleOrderSamples.Length;
             // run the workflow n times based on the number of samples in the json
@@ -360,7 +357,7 @@ namespace Customization.Tasks
 
             IList<IEntity> samplesList = new List<IEntity>();
 
-            for(int i = 0; i < sampleCount; i++)
+            for (int i = 0; i < sampleCount; i++)
             {
                 var iSample = saleorderjson.SaleOrderSamples[i];
 
@@ -374,7 +371,7 @@ namespace Customization.Tasks
                     }
                     else
                     {
-                        
+
                         IEntity sample = RunWorkflowForEntity(job, sampwf, 1).FirstOrDefault();
                         samplesList.Add(sample);
                     }
@@ -414,7 +411,7 @@ namespace Customization.Tasks
                     sample.ExternalReference = inputSample.ExternalReference;
                     sample.Variety = inputSample.Variety;
                     sample.Lod = inputSample.Lod;
-                    sample.SampSubtype = EntityManager.Select<SampleSubtypeBase>(inputSample.SampSubtype); 
+                    sample.SampSubtype = EntityManager.Select<SampleSubtypeBase>(inputSample.SampSubtype);
                     sample.SampType = EntityManager.Select<SampleTypeBase>(inputSample.SampleType);
                     sample.SampleSize = inputSample.SampleSize;
                     sample.SampleSizeUnit = EntityManager.SelectByName(PhraseBase.EntityName, inputSample.SampleSizeUnit) as PhraseBase;

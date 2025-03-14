@@ -187,10 +187,10 @@ namespace Customization.Tasks
         public string SampleType { get; set; }
 
         /// <summary>
-        /// Gets or sets the SamplesTypeIdentity.
+        /// Gets or sets the SamplesDescription.
         /// </summary>
         /// <value>
-        /// The sample type.
+        /// The SamplesDescription.
         /// </value>
         [DataMember(Name = "SamplesDescription")]
         public string SampleDescription { get; set; }
