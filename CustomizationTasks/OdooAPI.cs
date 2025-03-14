@@ -215,12 +215,12 @@ namespace Customization.Tasks
             {
                 var iSample = saleorderjson.SaleOrderSamples[i];
 
-                if (!string.IsNullOrEmpty(iSample.SampleWorkflow))
+                if (!string.IsNullOrEmpty(iSample.SampleDescription))
                 {
-                    Workflow sampwf = EntityManager.SelectByName(Workflow.EntityName, GetConfigHeader(iSample.SampleWorkflow)) as Workflow;
+                    Workflow sampwf = EntityManager.SelectByName(Workflow.EntityName, GetConfigHeader(iSample.SampleDescription)) as Workflow;
                     if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, sampwf?.WorkflowGuid) is Workflow workflow))
                     {
-                        SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {iSample.SampleWorkflow} on sample {i}");
+                        SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {iSample.SampleDescription} on sample {i}");
                         return Task.CompletedTask;
                     }
                     else

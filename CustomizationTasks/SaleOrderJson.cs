@@ -369,8 +369,6 @@ namespace Customization.Tasks
         [DataMember(Name = "LOD")]
         public double Lod { get; set; }
 
-      
-
 
         /// <summary>
         /// Gets or sets the testschedule.
