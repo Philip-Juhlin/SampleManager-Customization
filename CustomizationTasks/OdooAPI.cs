@@ -132,8 +132,25 @@ namespace Customization.Tasks
 
 
                 int sampleCount = json.SaleOrderSamples.Length;
-                // run the workflow n times based on the number of samples in the json
-                //IList<IEntity> samplesList = RunWorkflowForEntity(job, sampleWorkflow, sampleCount);
+
+                string workflowfirst = json.SaleOrderSamples[0].SampleDescription;
+
+                if (!string.IsNullOrEmpty(workflowfirst))
+                {
+
+                    SetHttpStatus(HttpStatusCode.BadRequest, "the sample desciption is empty");
+
+                }
+
+                Workflow sampwf = EntityManager.SelectByName(Workflow.EntityName, GetConfigHeader(workflowfirst)) as Workflow;
+                if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, sampwf?.WorkflowGuid) is Workflow sampworkflow))
+                {
+                    SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {workflowfirst} ");
+                    return;
+                }
+
+                    // run the workflow n times based on the number of samples in the json
+                    //IList<IEntity> samplesList = RunWorkflowForEntity(job, sampleWorkflow, sampleCount);
 
                 IList<IEntity> samplesList = new List<IEntity>();
 
@@ -141,28 +158,10 @@ namespace Customization.Tasks
                 {
                     var iSample = json.SaleOrderSamples[i];
 
-                    if (!string.IsNullOrEmpty(iSample.SampleDescription))
-                    {
-                        Workflow sampwf = EntityManager.SelectByName(Workflow.EntityName, GetConfigHeader(iSample.SampleDescription)) as Workflow;
-                        if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, sampwf?.WorkflowGuid) is Workflow sampworkflow))
-                        {
-                            SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {iSample.SampleDescription} on sample {i}");
-                            return;
-                        }
-                        else
-                        {
-
+               
                             IEntity sample = RunWorkflowForEntity(job, sampwf, 1).FirstOrDefault();
                             samplesList.Add(sample);
-                        }
-
-                    }
-                    else
-                    {
-                        SetHttpStatus(HttpStatusCode.BadRequest, $"sample {i} does not contain a workflow");
-                        return;
-                    }
-
+                        
 
                 }
                 //if the workflow count is not equal to the number of samples then send error
