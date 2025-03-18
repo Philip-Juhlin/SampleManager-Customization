@@ -82,7 +82,7 @@ namespace Customization.Tasks
             Workflow wf = EntityManager.SelectByName(Workflow.EntityName, GetConfigHeader("ITK_STANDARD_JOB")) as Workflow;
             if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, wf?.WorkflowGuid) is Workflow jobWorkFlow))
             {
-                SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {wf}");
+                SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found1 {wf}");
                 return;
             }
 
@@ -130,22 +130,25 @@ namespace Customization.Tasks
             //Create the samples in Lims on the created job
             //CreateSamples(json, workflow, job);
 
+           int sampleCount = json.SaleOrderSamples.Length;
 
-            int sampleCount = json.SaleOrderSamples.Length;
+           string workflowfirst = string.Empty;
+           if (json.SaleOrderSamples != null && json.SaleOrderSamples.Length > 0 && !string.IsNullOrEmpty(json.SaleOrderSamples[0].SampleWorkflow))
+           {
+       	     	workflowfirst = json.SaleOrderSamples[0].SampleWorkflow;
+           }
+           else
+           {
 
-            string workflowfirst = json.SaleOrderSamples[0].SampleWorkflow;
-
-            if (!string.IsNullOrEmpty(workflowfirst))
-            {
-
-                SetHttpStatus(HttpStatusCode.BadRequest, "the sample desciption is empty");
+		SetHttpStatus(HttpStatusCode.BadRequest, "the sample workflow is empty");
+		return;
 
             }
 
 
 
 
-            Workflow sampwf = EntityManager.Select<Workflow>(workflowfirst);
+            Workflow sampwf = EntityManager.SelectByName(Workflow.EntityName, workflowfirst) as Workflow;
             if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, sampwf?.WorkflowGuid) is Workflow sampworkflow))
             {
                 SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {workflowfirst} ");
@@ -153,7 +156,7 @@ namespace Customization.Tasks
             }
 
             // run the workflow n times based on the number of samples in the json
-            IList<IEntity> samplesList = RunWorkflowForEntity(job, sampwf, sampleCount);
+            IList<IEntity> samplesList = RunWorkflowForEntity(job, sampworkflow, sampleCount);
 
             //if the workflow count is not equal to the number of samples then send error
             if (samplesList.Count != sampleCount)
