@@ -358,7 +358,7 @@ namespace Customization.Tasks
         ///// The workflow.
         ///// </value>
         //[DataMember(Name = "SamplesWorkflow")]
-        //public string SampleWorkflow { get; set; }
+        public string SampleWorkflow { get; set; }
 
         /// <summary>
         /// Gets or sets the limit of detection.

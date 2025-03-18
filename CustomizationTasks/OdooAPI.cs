@@ -133,7 +133,7 @@ namespace Customization.Tasks
 
             int sampleCount = json.SaleOrderSamples.Length;
 
-            string workflowfirst = json.SaleOrderSamples[0].SampleDescription;
+            string workflowfirst = json.SaleOrderSamples[0].SampleWorkflow;
 
             if (!string.IsNullOrEmpty(workflowfirst))
             {
@@ -145,7 +145,7 @@ namespace Customization.Tasks
 
 
 
-            Workflow sampwf = EntityManager.SelectByName(Workflow.EntityName, GetConfigHeader(workflowfirst)) as Workflow;
+            Workflow sampwf = EntityManager.Select<Workflow>(workflowfirst);
             if (!(EntityManager.SelectLatestVersion(Workflow.EntityName, sampwf?.WorkflowGuid) is Workflow sampworkflow))
             {
                 SetHttpStatus(HttpStatusCode.BadRequest, $"workflow not found {workflowfirst} ");
