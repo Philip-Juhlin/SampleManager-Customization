@@ -357,7 +357,7 @@ namespace Customization.Tasks
         ///// <value>
         ///// The workflow.
         ///// </value>
-        //[DataMember(Name = "SamplesWorkflow")]
+        [DataMember(Name = "SamplesWorkflow")]
         public string SampleWorkflow { get; set; }
 
         /// <summary>
