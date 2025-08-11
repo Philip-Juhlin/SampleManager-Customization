@@ -41,13 +41,10 @@ This repository contains customizations and extensions for Thermo Fisher SampleM
 - .NET Framework (version as specified in the `.csproj` files)
 - Visual Studio (recommended for development)
 
-## Contributing
-
-Contributions are welcome! Please open issues or submit pull requests for bug fixes or new features.
-
 ## License
 
-[Specify your license here, e.g., MIT, Apache 2.0, etc.]
+This project is provided as-is for internal and reference use.  
+There are no restrictions on use, but no warranty or support
 
 ---
 
