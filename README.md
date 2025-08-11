@@ -13,7 +13,7 @@ This repository contains customizations and extensions for Thermo Fisher SampleM
   - [`ExcelReportBulk.cs`](CustomizationTasks/ExcelReportBulk.cs): Bulk Excel report generation.
   - [`FindDuplicateLoginsTask.cs`](CustomizationTasks/FindDuplicateLoginsTask.cs): Utility for finding duplicate logins.
   - [`JbvExcelReport.cs`](CustomizationTasks/JbvExcelReport.cs), [`JbvXmlResultTask.cs`](CustomizationTasks/JbvXmlResultTask.cs): JBV-specific reporting tasks.
-  - [`OdooAPI.cs`](CustomizationTasks/OdooAPI.cs): Integration with Odoo API.
+  - [`OdooAPI.cs`](CustomizationTasks/OdooAPI.cs): Integration with Odoo.
   - [`PcrPlateFormTask.cs`](CustomizationTasks/PcrPlateFormTask.cs): PCR plate form automation.
   - [`SaleOrderJson.cs`](CustomizationTasks/SaleOrderJson.cs): Sale order JSON processing.
   - [`TrainingRecordCustomCheckTask.cs`](CustomizationTasks/TrainingRecordCustomCheckTask.cs): Custom training record checks.
